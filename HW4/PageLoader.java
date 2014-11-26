@@ -6,6 +6,7 @@ package HW4;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Hashtable;
+import java.util.Stack;
 
 public class PageLoader
 {
@@ -65,5 +66,132 @@ public class PageLoader
 		}
 
 	}	// end of loadFile() function
+
+	/* Search the content of the file.
+	 */
+	public void find( String searchingPattern )
+	{
+		Boolean[] isMatched = new Boolean[ pagePaths_.length ];
+		for ( int i = 0; i < isMatched.length; ++i )
+			isMatched[i] = false;
+
+		isMatched = searchContent( isMatched, searchingPattern );
+		for ( Boolean singleMatch : isMatched )
+			System.out.println( singleMatch );
+	}
+
+	/* Search the content of the file.
+	 * Return true, if matched.
+	 */
+	private Boolean[] searchContent( Boolean[] isMatched, String searchingPattern )
+	{
+		Stack< CharacterPosition > stack = new Stack< CharacterPosition >();
+		ArrayList< CharacterPosition > arrayListSearchingNow;
+		int[] arrayListIndex = new int[ searchingPattern.length() ];
+		int charSearchingNow = 0;
+		Boolean moveToNextOrLastChar = false;
+		CharacterPosition characterPositionSearchingNow = null;
+		CharacterPosition characterPositionCompare = null;
+
+		// There is only 1 character in the searching pattern.
+		// All of elements of the information of the position of this character would be matched.
+		if ( searchingPattern.length() == 1 )
+		{
+			if ( ( arrayListSearchingNow = getArrayListByChar( searchingPattern.charAt(0) ) ) == null )
+				return isMatched;
+
+			for ( int i = 0; i < arrayListSearchingNow.size(); ++i )
+				isMatched[ arrayListSearchingNow.get(i).fileID ] = true;
+
+			return isMatched;
+		}
+
+		while ( charSearchingNow < searchingPattern.length() )
+		{
+			moveToNextOrLastChar = false;
+
+			if ( charSearchingNow == 0 )
+			{
+				if ( ( arrayListSearchingNow = getArrayListByChar( searchingPattern.charAt(charSearchingNow) ) ) == null )
+					break;
+
+				if ( arrayListIndex[0] == arrayListSearchingNow.size() )
+					break;
+
+				characterPositionSearchingNow = arrayListSearchingNow.get( arrayListIndex[0] );
+				++arrayListIndex[0];	// Increase the index of the next element of the array list of the first character
+				++charSearchingNow;		// Move to the next character of the searching pattern
+			}
+
+			// Get the array list of the information of the position of the next character
+			if ( ( arrayListSearchingNow = getArrayListByChar( searchingPattern.charAt(charSearchingNow) ) ) == null )
+				break;
+			// All position of this character is searched, and then terminate the matching.
+			if ( arrayListIndex[charSearchingNow] == arrayListSearchingNow.size() )
+				break;
+
+			for ( int i = arrayListIndex[ charSearchingNow ]; i < arrayListSearchingNow.size(); ++i )
+			{
+				arrayListIndex[ charSearchingNow ] = i;
+
+				characterPositionCompare = arrayListSearchingNow.get(i);
+
+				if ( characterPositionSearchingNow.fileID == characterPositionCompare.fileID &&
+						characterPositionSearchingNow.row == characterPositionCompare.row &&
+						characterPositionSearchingNow.column == characterPositionCompare.column - 1 )
+				{
+					++arrayListIndex[charSearchingNow];
+					++charSearchingNow;
+					stack.push( characterPositionSearchingNow );
+					characterPositionSearchingNow = characterPositionCompare;
+					moveToNextOrLastChar = true;
+					break;
+				}
+
+				if ( characterPositionSearchingNow.fileID < characterPositionCompare.fileID ||
+						( characterPositionSearchingNow.fileID == characterPositionCompare.fileID &&
+						characterPositionSearchingNow.row < characterPositionCompare.row ) ||
+						( characterPositionSearchingNow.fileID == characterPositionCompare.fileID &&
+						characterPositionSearchingNow.row == characterPositionCompare.row &&
+						characterPositionSearchingNow.column < characterPositionCompare.column ) )
+				{
+					--charSearchingNow;
+					if ( !stack.isEmpty() )
+						characterPositionSearchingNow = stack.pop();
+					moveToNextOrLastChar = true;
+					break;
+				}
+			}
+
+			// All characters are matched. Mark the file and reset to match the next pattern.
+			if ( charSearchingNow == searchingPattern.length() )
+			{
+				isMatched[ characterPositionSearchingNow.fileID ] = true;
+				charSearchingNow = 0;
+			}
+
+			// All position of this character is searched,
+			// and there is no matched position.
+			if ( !moveToNextOrLastChar )
+				break;
+
+		}	// end of while ( charSearchingNow < searchingPattern.length() )
+
+		return isMatched;
+
+	}	// end of searchContent() function
+
+	/* Get the array list of the information of the position of the characters.
+	 * If it dosen't contain the character specified, return null.
+	 */
+	private ArrayList< CharacterPosition > getArrayListByChar( Character character )
+	{
+		if ( !charPos_.containsKey( character ) )
+			return null;
+		else
+		{
+			return charPos_.get( character );
+		}
+	}
 
 }	// end of class PageLoader
