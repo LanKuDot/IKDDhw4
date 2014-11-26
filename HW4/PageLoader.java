@@ -12,6 +12,8 @@ public class PageLoader
 {
 	private String[] pagePaths_;		/* All paths of the text files */
 	private Hashtable< Character, ArrayList<CharacterPosition> > charPos_;
+	private int[][] pageLinkCount_;		/* Store the number of links to another file */
+	private float[] finalPageRank_;
 
 	/* Constructor: Store the paths which are user assigned,
 	 * and create new hash table to store the information of the content.
@@ -20,6 +22,8 @@ public class PageLoader
 	{
 		pagePaths_ = filePaths;
 		charPos_ = new Hashtable< Character, ArrayList<CharacterPosition> >();
+		pageLinkCount_ = new int[pagePaths_.length][pagePaths_.length];
+		finalPageRank_ = new float[pagePaths_.length];
 
 	}	// end of constructor PageLoader( String )
 
@@ -33,6 +37,8 @@ public class PageLoader
 
 	/* Load the content of the file and store the information of the characters
 	 * into the hashTable.
+	 * At the same time, search the hyper-links in the file, and count the link by
+	 * increasing pageLinkCount_[from][to].
 	 */
 	private void loadContentToHashTable( int fileIndex )
 	throws FileNotFoundException, IOException
@@ -42,6 +48,7 @@ public class PageLoader
 		String stringNow;
 		int rowNow = 0;
 		int columnNow = 0;
+		int indexOfHyperLink = 0;	// The index where the hyper-link starts in the string
 
 		while( ( stringNow = reader.readLine() ) != null )
 		{
@@ -63,9 +70,118 @@ public class PageLoader
 					tmpList.add( new CharacterPosition( fileIndex, rowNow, columnNow ) );
 					charPos_.put( aChar, tmpList );
 				}
+
+			// Search hyper-links in the file
+			indexOfHyperLink = 0;
+			while ( ( indexOfHyperLink = stringNow.indexOf( "http://", indexOfHyperLink + "http://".length() ) ) != -1 )
+			{
+				++pageLinkCount_[fileIndex][ stringNow.charAt( stringNow.indexOf( ".txt", indexOfHyperLink ) - 1 ) - 49 ];
+			}
 		}
 
 	}	// end of loadFile() function
+
+	/* Calculate the page rank each file.
+	 */
+	public void calculatePageRank()
+	{
+		float[] tmpPageRank = new float[ pagePaths_.length ];		/* Temporary store the result */
+		float[][] transformMatrix = new float[ pagePaths_.length ][ pagePaths_.length ];
+		int[] pageLinkCount = new int[ pagePaths_.length ];
+		Boolean[] isDeadEnd = new Boolean[ pagePaths_.length ];
+		Boolean newDeadEndFound = false;
+		for ( int i = 0; i < isDeadEnd.length; ++i )
+			isDeadEnd[i] = false;
+
+		// Find the dead ends
+		for ( int from = 0; from < pageLinkCount_.length; ++from )
+		{
+			for ( float eachCount : pageLinkCount_[from] )
+				pageLinkCount[from] += eachCount;
+
+			if ( pageLinkCount[from] == 0 )
+			{
+				isDeadEnd[ from ] = true;
+				newDeadEndFound = true;
+			}
+		}
+		while ( newDeadEndFound )
+		{
+			newDeadEndFound = false;
+			for ( int from = 0; from < pageLinkCount_.length; ++from )
+			{
+				int linkToDeadEndCount = 0;
+				for ( int to = 0; to < pageLinkCount_[from].length; ++to )
+					if ( pageLinkCount_[from][to] > 0 && isDeadEnd[ to ] )
+						++linkToDeadEndCount;
+
+				if ( pageLinkCount[from] == linkToDeadEndCount && isDeadEnd[ from ] == false )
+				{
+					isDeadEnd[ from ] = true;
+					newDeadEndFound = true;
+					break;
+				}
+			}
+		}
+
+		// Generate transform matrix
+		for ( int from = 0; from < pageLinkCount_.length; ++from )
+		{
+			int totalCount = 0;
+			for ( int to = 0; to < pageLinkCount_[from].length; ++to )
+				if ( pageLinkCount_[from][to] > 0 && !isDeadEnd[to] )	// Ignore the link to dead end
+				{
+					transformMatrix[from][to] = pageLinkCount_[from][to];
+					totalCount += pageLinkCount_[from][to];
+				}
+			for ( int to = 0; to < pageLinkCount_[from].length; ++to )
+			{
+				if ( totalCount == 0 )
+					continue;
+				transformMatrix[from][to] /= totalCount;
+			}
+		}
+
+		// Initialize the finalPageRank
+		int startPoints = 0;
+		for ( int i = 0; i < isDeadEnd.length; ++i )
+			if ( !isDeadEnd[i] ) ++startPoints;
+		for ( int i = 0; i < finalPageRank_.length; ++i )
+			if ( !isDeadEnd[i] ) finalPageRank_[i] = 1.0f / (float)startPoints;
+
+		// Calculate the page rank instead of dead end
+		for ( int times = 0; times < 100000; ++times )
+		{
+			// Reset the temporary result
+			for ( int i = 0; i < tmpPageRank.length; ++i )
+				tmpPageRank[i] = 0.0f;
+
+			// tmpPageRank = finalPageRank * transformMatrix^T
+			for ( int target = 0; target < tmpPageRank.length; ++target )
+			{
+				for ( int j = 0; j < tmpPageRank.length; ++j )
+				{
+					tmpPageRank[ target ] += finalPageRank_[j] * transformMatrix[j][target];
+				}
+			}
+
+			// Update the finalPageRank
+			for ( int i = 0; i < tmpPageRank.length; ++i )
+				finalPageRank_[i] = tmpPageRank[i];
+		}
+
+		// Calculate the page rank of the dead end
+		for ( int to = 0; to < isDeadEnd.length; ++to )
+			if ( isDeadEnd[to] )
+			{
+				for ( int from = 0; from < finalPageRank_.length; ++from )
+				{
+					if ( pageLinkCount_[from][to] > 0 )
+						finalPageRank_[to] += finalPageRank_[from] * (float)( pageLinkCount_[from][to] ) / (float)pageLinkCount[from];
+				}
+			}
+
+	}	// end of calculatePageRank() function
 
 	/* Search the content of the file.
 	 */
