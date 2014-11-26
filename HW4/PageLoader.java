@@ -218,7 +218,7 @@ public class PageLoader
 			}
 
 			isMatched[theIndex] = false;
-			System.out.println( i + "\tpage" + (theIndex + 1) + ".txt" );
+			System.out.println( (i+1) + "\tpage" + (theIndex + 1) + ".txt" );
 		}
 	}
 
