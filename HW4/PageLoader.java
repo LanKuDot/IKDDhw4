@@ -184,16 +184,42 @@ public class PageLoader
 	}	// end of calculatePageRank() function
 
 	/* Search the content of the file.
+	 * And print out the matched file in order of the page rank.
 	 */
 	public void find( String searchingPattern )
 	{
+		int matchedCount = 0;
 		Boolean[] isMatched = new Boolean[ pagePaths_.length ];
 		for ( int i = 0; i < isMatched.length; ++i )
 			isMatched[i] = false;
 
 		isMatched = searchContent( isMatched, searchingPattern );
 		for ( Boolean singleMatch : isMatched )
-			System.out.println( singleMatch );
+			if ( singleMatch ) ++matchedCount;
+
+		if ( matchedCount == 0 )
+		{
+			System.out.println( "Not Found!" );
+			return;
+		}
+
+		for ( int i = 0; i < matchedCount; ++i )
+		{
+			float theLargestPageRank = 0.0f;
+			int theIndex = -1;
+
+			for ( int target = 0; target < isMatched.length; ++target )
+			{
+				if ( isMatched[target] && finalPageRank_[target] > theLargestPageRank )
+				{
+					theIndex = target;
+					theLargestPageRank = finalPageRank_[target];
+				}
+			}
+
+			isMatched[theIndex] = false;
+			System.out.println( i + "\tpage" + (theIndex + 1) + ".txt" );
+		}
 	}
 
 	/* Search the content of the file.
